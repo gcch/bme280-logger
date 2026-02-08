@@ -1,0 +1,14 @@
+[project]
+name = "bme280-logger"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "adafruit-blinka>=8.69.0",
+    "adafruit-circuitpython-bme280>=2.6.30",
+    "configparser>=7.2.0",
+    "influxdb-client>=1.50.0",
+    "rpi-gpio>=0.7.1",
+    "smbus2>=0.6.0",
+]

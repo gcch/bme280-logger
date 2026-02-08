@@ -1,0 +1,5 @@
+[InfluxDB]
+url = http://influxdb:8086
+org = org-name
+token = XXXXXXXXXX
+bucket = bucket-name
