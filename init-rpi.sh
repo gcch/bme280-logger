@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# init.sh
+# init-rpi.sh
 #
 # Copyright (c) 2026 gcch
 #
