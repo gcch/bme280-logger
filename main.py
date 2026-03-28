@@ -1,4 +1,5 @@
 import datetime
+import socket
 import configparser
 import board
 from adafruit_bme280 import basic as adafruit_bme280
@@ -12,6 +13,10 @@ config.read(CONFIG_FILE, encoding="utf8")
 
 def main():
 
+    device_name = config.get("Device", "name", fallback="bme280")
+    device_i2c_address = config.get("Device", "address", fallback=0x76)
+    hostname = socket.gethostname()
+
     # Get data
     i2c = board.I2C()
     bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
@@ -21,8 +26,8 @@ def main():
         '_time': timestamp,
         'measurement': 'env-sensor',
         'tags': { 
-            'client': 'rpi3b',
-            'sensor': 'bme280'
+            'client': hostname,
+            'sensor': device_name
         },
         'fields': {
             'temperature': bme280.temperature,
@@ -30,6 +35,7 @@ def main():
             'humidity': bme280.humidity
         }
     }
+    print(df)
     
     # Write to InfluxDB
     url = config.get("InfluxDB", "url", fallback="")

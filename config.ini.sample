@@ -1,3 +1,7 @@
+[Device]
+name = bme280
+address = 0x76
+
 [InfluxDB]
 url = http://influxdb:8086
 org = org-name

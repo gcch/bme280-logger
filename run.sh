@@ -1,6 +1,8 @@
 #!/bin/bash
 
-i2cdetect -y 1
+if [ "$(uname)" = "Linux" ]; then
+    i2cdetect -y 1
+fi
 
 SCRIPT_DIR=$(cd $(dirname $0); pwd)
 cd "${SCRIPT_DIR}"
