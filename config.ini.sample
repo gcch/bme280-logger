@@ -2,6 +2,7 @@
 name = bme280
 address = 0x76
 i2c_bus = 1
+ftdi_url = ftdi://ftdi:ft232h/1
 
 [InfluxDB]
 url = http://influxdb:8086
