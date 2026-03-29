@@ -46,7 +46,7 @@ echo "* 0 * * * root /opt/bme280-logger/run.sh" > /etc/cron.d/bme280-logger
 
 ### （必要に応じて）Proxmox VE ホストでのデバイスアクセス許可設定
 
-スクリプトを LXC 環境で動作させる場合、LXC への USB デバイスのアクセス許可が必要。
+ロガーを LXC 環境で動作させる場合、LXC への USB デバイスのアクセス許可が必要。
 `/etc/pve/lxc/<CTID>.conf` に以下を追記。
 ```
 lxc.cgroup2.devices.allow: c 189:* rwm
@@ -57,4 +57,17 @@ lxc.mount.entry: /dev/bus/usb/001 dev/bus/usb/001 none bind,optional,create=dir
 ドライバ `ftdi_sio` で読み込まれてしまうと、I2C でアクセスできなくなってしまうため、以下内容の `/etc/modprobe.d/blacklist-ftdi.conf` を作成。
 ```
 blacklist ftdi_sio
+```
+
+デバイスを抜き差しし、`lsusb` コマンドで `Driver` が `[none]` 表示になることを確認。
+
+```
+# lsusb
+   :
+Bus 001 Device 013: ID 0403:6014 Future Technology Devices International, Ltd FT232H Single HS USB-UART/FIFO IC
+   :
+# lsusb -t
+/:  Bus 001.Port 001: ...
+    |__ Port 003: Dev 013, If 0, Class=Vendor Specific Class, Driver=[none], 480M
+   :
 ```
