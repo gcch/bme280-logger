@@ -137,7 +137,7 @@ def main():
         },
         'fields': data,
     }
-    print(df)
+    #print(df)
 
     url    = config.get("InfluxDB", "url",    fallback="")
     org    = config.get("InfluxDB", "org",    fallback="")
