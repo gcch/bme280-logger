@@ -41,7 +41,7 @@ vi config.ini
 
 定期実行のため、cron の設定を実施。
 ```
-echo "* 0 * * * root /opt/bme280-logger/run.sh" > /etc/cron.d/bme280-logger
+echo "*/10 * * * * root /opt/bme280-logger/run.sh" > /etc/cron.d/bme280-logger
 ```
 
 ### （必要に応じて）Proxmox VE ホストでのデバイスアクセス許可設定
