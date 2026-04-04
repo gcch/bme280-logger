@@ -16,42 +16,21 @@ config.read(CONFIG_FILE, encoding="utf8")
 
 CALIBRATION_CACHE_FILE = "calibration_cache.json"
 
+
 class FtdiI2cBus:
     """Adapter to make pyftdi I2cPort compatible with smbus2.SMBus API"""
 
     def __init__(self, port):
         self._port = port
 
-    def write_byte_data(self, addr, register, value, retries=3):
-        for attempt in range(retries):
-            try:
-                self._port.write_to(register, bytes([value]))
-                return
-            except I2cNackError:
-                if attempt < retries - 1:
-                    time.sleep(0.5)
-                else:
-                    raise
+    def write_byte_data(self, addr, register, value):
+        self._port.write_to(register, bytes([value]))
 
-    def read_byte_data(self, addr, register, retries=3):
-        for attempt in range(retries):
-            try:
-                return self._port.read_from(register, 1)[0]
-            except I2cNackError:
-                if attempt < retries - 1:
-                    time.sleep(0.5)
-                else:
-                    raise
+    def read_byte_data(self, addr, register):
+        return self._port.read_from(register, 1)[0]
 
-    def read_i2c_block_data(self, addr, register, length, retries=3):
-        for attempt in range(retries):
-            try:
-                return list(self._port.read_from(register, length))
-            except I2cNackError:
-                if attempt < retries - 1:
-                    time.sleep(0.5)
-                else:
-                    raise
+    def read_i2c_block_data(self, addr, register, length):
+        return list(self._port.read_from(register, length))
 
 
 class BME280:
@@ -190,28 +169,24 @@ def main():
     address     = int(address_str, 0)
     hostname    = socket.gethostname()
 
-    # Initialize I2C controller via FT4232H
-    ctrl = I2cController()
-    ctrl.configure(ftdi_url)
-    time.sleep(0.5)  # Wait for device to stabilize after reset
-    port = ctrl.get_port(address)
-    bus  = FtdiI2cBus(port)
-
+    # Retry by re-initializing I2cController on NACK
     data = None
-    try:
-        # Retry on NACK (device may not be ready immediately after reset)
-        for attempt in range(3):
-            try:
-                bme280 = BME280(bus, address=address, cache_file=cache_file)
-                data   = bme280.read()
-                break
-            except I2cNackError:
-                if attempt < 2:
-                    time.sleep(1.0)
-                else:
-                    raise
-    finally:
-        ctrl.terminate()
+    for attempt in range(3):
+        ctrl = I2cController()
+        ctrl.configure(ftdi_url)
+        time.sleep(0.5)
+        port = ctrl.get_port(address)
+        bus  = FtdiI2cBus(port)
+        try:
+            bme280 = BME280(bus, address=address, cache_file=cache_file)
+            data   = bme280.read()
+            ctrl.terminate()
+            break
+        except I2cNackError:
+            ctrl.terminate()
+            time.sleep(0.5)
+            if attempt == 2:
+                raise
 
     print(data)
 
