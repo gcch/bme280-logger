@@ -2,18 +2,19 @@ import datetime
 import socket
 import configparser
 import struct
+import time
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
-from pyftdi.i2c import I2cController
+from pyftdi.i2c import I2cController, I2cNackError
 
-# config
+# Load config
 config = configparser.ConfigParser()
 CONFIG_FILE = "config.ini"
 config.read(CONFIG_FILE, encoding="utf8")
 
 
 class FtdiI2cBus:
-    """pyftdi I2cPort を smbus2.SMBus 互換に見せるアダプタ"""
+    """Adapter to make pyftdi I2cPort compatible with smbus2.SMBus API"""
 
     def __init__(self, port):
         self._port = port
@@ -29,17 +30,18 @@ class FtdiI2cBus:
 
 
 class BME280:
-    """pyftdi/smbus2共通アダプタベースの最小BME280ドライバ"""
+    """Minimal BME280 driver based on pyftdi/smbus2 compatible adapter"""
 
     def __init__(self, bus: FtdiI2cBus, address: int = 0x76):
         self.bus = bus
         self.address = address
         self._load_calibration()
-        # forced mode / osrs_t=1 / osrs_p=1 / osrs_h=1
+        # Set forced mode / osrs_t=1 / osrs_p=1 / osrs_h=1
         self.bus.write_byte_data(self.address, 0xF2, 0x01)
         self.bus.write_byte_data(self.address, 0xF4, 0x25)
 
     def _load_calibration(self):
+        # Read temperature and pressure calibration data (0x88-0x9F)
         raw = self.bus.read_i2c_block_data(self.address, 0x88, 24)
         self.dig_T1 = struct.unpack_from('<H', bytes(raw), 0)[0]
         self.dig_T2 = struct.unpack_from('<h', bytes(raw), 2)[0]
@@ -53,6 +55,7 @@ class BME280:
         self.dig_P7 = struct.unpack_from('<h', bytes(raw), 18)[0]
         self.dig_P8 = struct.unpack_from('<h', bytes(raw), 20)[0]
         self.dig_P9 = struct.unpack_from('<h', bytes(raw), 22)[0]
+        # Read humidity calibration data (0xA1, 0xE1-0xE7)
         self.dig_H1 = self.bus.read_byte_data(self.address, 0xA1)
         raw2 = self.bus.read_i2c_block_data(self.address, 0xE1, 7)
         self.dig_H2 = struct.unpack_from('<h', bytes(raw2), 0)[0]
@@ -62,6 +65,7 @@ class BME280:
         self.dig_H6 = struct.unpack_from('<b', bytes(raw2), 6)[0]
 
     def _read_raw(self):
+        # Read raw ADC values for pressure, temperature, and humidity
         data = self.bus.read_i2c_block_data(self.address, 0xF7, 8)
         raw_p = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4)
         raw_t = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4)
@@ -69,12 +73,14 @@ class BME280:
         return raw_p, raw_t, raw_h
 
     def _compensate_temperature(self, raw_t):
+        # Bosch compensation formula for temperature
         v1 = (raw_t / 16384.0 - self.dig_T1 / 1024.0) * self.dig_T2
         v2 = (raw_t / 131072.0 - self.dig_T1 / 8192.0) ** 2 * self.dig_T3
         self.t_fine = v1 + v2
         return self.t_fine / 5120.0
 
     def _compensate_pressure(self, raw_p):
+        # Bosch compensation formula for pressure
         v1 = self.t_fine / 2.0 - 64000.0
         v2 = v1 * v1 * self.dig_P6 / 32768.0
         v2 += v1 * self.dig_P5 * 2.0
@@ -90,6 +96,7 @@ class BME280:
         return (p + (v1 + v2 + self.dig_P7) / 16.0) / 100.0  # hPa
 
     def _compensate_humidity(self, raw_h):
+        # Bosch compensation formula for humidity
         h = self.t_fine - 76800.0
         if h == 0:
             return 0.0
@@ -112,20 +119,33 @@ class BME280:
 def main():
     device_name = config.get("Device", "name",     fallback="bme280")
     address_str = config.get("Device", "address",  fallback="0x76")
-    ftdi_url    = config.get("Device", "ftdi_url", fallback="ftdi://ftdi:ft232h/1")
+    ftdi_url    = config.get("Device", "ftdi_url", fallback="ftdi://ftdi:4232/1")
     address     = int(address_str, 0)
     hostname    = socket.gethostname()
 
+    # Initialize I2C controller via FT4232H
     ctrl = I2cController()
     ctrl.configure(ftdi_url)
     port = ctrl.get_port(address)
     bus  = FtdiI2cBus(port)
 
+    data = None
     try:
-        bme280 = BME280(bus, address=address)
-        data   = bme280.read()
+        # Retry on NACK (device may not be ready immediately after reset)
+        for attempt in range(3):
+            try:
+                bme280 = BME280(bus, address=address)
+                data   = bme280.read()
+                break
+            except I2cNackError:
+                if attempt < 2:
+                    time.sleep(0.5)
+                else:
+                    raise
     finally:
         ctrl.terminate()
+
+    print(data)
 
     timestamp = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
     df = {
@@ -137,8 +157,8 @@ def main():
         },
         'fields': data,
     }
-    #print(df)
 
+    # Write to InfluxDB
     url    = config.get("InfluxDB", "url",    fallback="")
     org    = config.get("InfluxDB", "org",    fallback="")
     token  = config.get("InfluxDB", "token",  fallback="")
