@@ -11,3 +11,6 @@ wheels/
 
 # Config
 config.ini
+
+# Temporary
+calibration_cache.json
