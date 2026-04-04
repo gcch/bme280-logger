@@ -16,21 +16,42 @@ config.read(CONFIG_FILE, encoding="utf8")
 
 CALIBRATION_CACHE_FILE = "calibration_cache.json"
 
-
 class FtdiI2cBus:
     """Adapter to make pyftdi I2cPort compatible with smbus2.SMBus API"""
 
     def __init__(self, port):
         self._port = port
 
-    def write_byte_data(self, addr, register, value):
-        self._port.write_to(register, bytes([value]))
+    def write_byte_data(self, addr, register, value, retries=3):
+        for attempt in range(retries):
+            try:
+                self._port.write_to(register, bytes([value]))
+                return
+            except I2cNackError:
+                if attempt < retries - 1:
+                    time.sleep(0.5)
+                else:
+                    raise
 
-    def read_byte_data(self, addr, register):
-        return self._port.read_from(register, 1)[0]
+    def read_byte_data(self, addr, register, retries=3):
+        for attempt in range(retries):
+            try:
+                return self._port.read_from(register, 1)[0]
+            except I2cNackError:
+                if attempt < retries - 1:
+                    time.sleep(0.5)
+                else:
+                    raise
 
-    def read_i2c_block_data(self, addr, register, length):
-        return list(self._port.read_from(register, length))
+    def read_i2c_block_data(self, addr, register, length, retries=3):
+        for attempt in range(retries):
+            try:
+                return list(self._port.read_from(register, length))
+            except I2cNackError:
+                if attempt < retries - 1:
+                    time.sleep(0.5)
+                else:
+                    raise
 
 
 class BME280:
