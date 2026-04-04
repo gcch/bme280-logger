@@ -3,6 +3,8 @@ import socket
 import configparser
 import struct
 import time
+import json
+import os
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
 from pyftdi.i2c import I2cController, I2cNackError
@@ -11,6 +13,8 @@ from pyftdi.i2c import I2cController, I2cNackError
 config = configparser.ConfigParser()
 CONFIG_FILE = "config.ini"
 config.read(CONFIG_FILE, encoding="utf8")
+
+CALIBRATION_CACHE_FILE = "calibration_cache.json"
 
 
 class FtdiI2cBus:
@@ -32,10 +36,15 @@ class FtdiI2cBus:
 class BME280:
     """Minimal BME280 driver based on pyftdi/smbus2 compatible adapter"""
 
-    def __init__(self, bus: FtdiI2cBus, address: int = 0x76):
+    def __init__(self, bus: FtdiI2cBus, address: int = 0x76, cache_file: str = CALIBRATION_CACHE_FILE):
         self.bus = bus
         self.address = address
-        self._load_calibration()
+        self.cache_file = cache_file
+        if os.path.exists(self.cache_file):
+            self._load_calibration_from_cache()
+        else:
+            self._load_calibration()
+            self._save_calibration_cache()
         # Set forced mode / osrs_t=1 / osrs_p=1 / osrs_h=1
         self.bus.write_byte_data(self.address, 0xF2, 0x01)
         self.bus.write_byte_data(self.address, 0xF4, 0x25)
@@ -63,6 +72,42 @@ class BME280:
         self.dig_H4 = (raw2[3] << 4) | (raw2[4] & 0x0F)
         self.dig_H5 = (raw2[5] << 4) | (raw2[4] >> 4)
         self.dig_H6 = struct.unpack_from('<b', bytes(raw2), 6)[0]
+
+    def _save_calibration_cache(self):
+        # Save calibration data to JSON cache file
+        cache = {
+            'dig_T1': self.dig_T1, 'dig_T2': self.dig_T2, 'dig_T3': self.dig_T3,
+            'dig_P1': self.dig_P1, 'dig_P2': self.dig_P2, 'dig_P3': self.dig_P3,
+            'dig_P4': self.dig_P4, 'dig_P5': self.dig_P5, 'dig_P6': self.dig_P6,
+            'dig_P7': self.dig_P7, 'dig_P8': self.dig_P8, 'dig_P9': self.dig_P9,
+            'dig_H1': self.dig_H1, 'dig_H2': self.dig_H2, 'dig_H3': self.dig_H3,
+            'dig_H4': self.dig_H4, 'dig_H5': self.dig_H5, 'dig_H6': self.dig_H6,
+        }
+        with open(self.cache_file, 'w') as f:
+            json.dump(cache, f)
+
+    def _load_calibration_from_cache(self):
+        # Load calibration data from JSON cache file
+        with open(self.cache_file, 'r') as f:
+            cache = json.load(f)
+        self.dig_T1 = cache['dig_T1']
+        self.dig_T2 = cache['dig_T2']
+        self.dig_T3 = cache['dig_T3']
+        self.dig_P1 = cache['dig_P1']
+        self.dig_P2 = cache['dig_P2']
+        self.dig_P3 = cache['dig_P3']
+        self.dig_P4 = cache['dig_P4']
+        self.dig_P5 = cache['dig_P5']
+        self.dig_P6 = cache['dig_P6']
+        self.dig_P7 = cache['dig_P7']
+        self.dig_P8 = cache['dig_P8']
+        self.dig_P9 = cache['dig_P9']
+        self.dig_H1 = cache['dig_H1']
+        self.dig_H2 = cache['dig_H2']
+        self.dig_H3 = cache['dig_H3']
+        self.dig_H4 = cache['dig_H4']
+        self.dig_H5 = cache['dig_H5']
+        self.dig_H6 = cache['dig_H6']
 
     def _read_raw(self):
         # Read raw ADC values for pressure, temperature, and humidity
@@ -117,15 +162,17 @@ class BME280:
 
 
 def main():
-    device_name = config.get("Device", "name",     fallback="bme280")
-    address_str = config.get("Device", "address",  fallback="0x76")
-    ftdi_url    = config.get("Device", "ftdi_url", fallback="ftdi://ftdi:4232/1")
+    device_name = config.get("Device", "name",       fallback="bme280")
+    address_str = config.get("Device", "address",    fallback="0x76")
+    ftdi_url    = config.get("Device", "ftdi_url",   fallback="ftdi://ftdi:4232/1")
+    cache_file  = config.get("Device", "cache_file", fallback=CALIBRATION_CACHE_FILE)
     address     = int(address_str, 0)
     hostname    = socket.gethostname()
 
     # Initialize I2C controller via FT4232H
     ctrl = I2cController()
     ctrl.configure(ftdi_url)
+    time.sleep(0.5)  # Wait for device to stabilize after reset
     port = ctrl.get_port(address)
     bus  = FtdiI2cBus(port)
 
@@ -134,12 +181,12 @@ def main():
         # Retry on NACK (device may not be ready immediately after reset)
         for attempt in range(3):
             try:
-                bme280 = BME280(bus, address=address)
+                bme280 = BME280(bus, address=address, cache_file=cache_file)
                 data   = bme280.read()
                 break
             except I2cNackError:
                 if attempt < 2:
-                    time.sleep(0.5)
+                    time.sleep(1.0)
                 else:
                     raise
     finally:
