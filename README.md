@@ -54,9 +54,11 @@ lxc.mount.entry: /dev/bus/usb/001 dev/bus/usb/001 none bind,optional,create=dir
 ```
 
 ### （必要に応じて）FTDI社デバイス（FT232Hなど）経由でアクセスさせる場合
-ドライバ `ftdi_sio` で読み込まれてしまうと、I2C でアクセスできなくなってしまうため、以下内容の `/etc/modprobe.d/blacklist-ftdi.conf` を作成。
+ドライバ `ftdi_sio` で読み込まれてしまうと、I2C でアクセスできなくなってしまうため、`/etc/modprobe.d/blacklist-ftdi.conf` を作成。
 ```
+cat << EOF > /etc/modprobe.d/blacklist-ftdi.conf
 blacklist ftdi_sio
+EOF
 ```
 
 デバイスを抜き差しし、`lsusb` コマンドで `Driver` が `[none]` 表示になることを確認。
