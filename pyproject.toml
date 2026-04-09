@@ -8,7 +8,7 @@ dependencies = [
     "smbus2",
     "configparser>=7.2.0",
     "influxdb-client>=1.50.0",
-    "pyftdi>=0.57.1; sys_platform == 'darwin'",
+    "pyftdi>=0.57.1",
     "rpi-gpio>=0.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
     "smbus2>=0.6.0",
 ]

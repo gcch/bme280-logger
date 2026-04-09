@@ -188,7 +188,7 @@ def main():
             if attempt == 2:
                 raise
 
-    print(data)
+    #print(data)
 
     timestamp = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
     df = {

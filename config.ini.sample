@@ -3,6 +3,7 @@ name = bme280
 address = 0x76
 i2c_bus = 1
 ftdi_url = ftdi://ftdi:ft232h/1
+cache_file = /opt/bme280-logger/calibration_cache.json
 
 [InfluxDB]
 url = http://influxdb:8086

@@ -35,7 +35,7 @@ def main():
             'humidity': bme280.humidity
         }
     }
-    print(df)
+    #print(df)
     
     # Write to InfluxDB
     url = config.get("InfluxDB", "url", fallback="")
