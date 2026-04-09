@@ -103,3 +103,14 @@ drwxr-xr-x 2 root root        100 Apr  8 23:10 .
 drwxr-xr-x 4 root root         80 Feb 22 11:54 ..
 crw-rw-rw- 1 root dialout 189, 35 Apr  9 22:47 008
 ```
+
+URL の確認。
+
+```
+# .venv/bin/python3 -c "
+from pyftdi.ftdi import Ftdi
+Ftdi.show_devices()
+"
+Available interfaces:
+  ftdi://ftdi:232h:1:a/1  (Single RS232-HS)
+```
