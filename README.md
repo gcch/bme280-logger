@@ -68,7 +68,7 @@ Bus 001 Device 013: ID 0403:6014 Future Technology Devices International, Ltd FT
    :
 # lsusb -t
 /:  Bus 001.Port 001: ...
-    |__ Port 003: Dev 013, If 0, Class=Vendor Specific Class, Driver=[none], 480M
+    |__ Port 001: Dev 008, If 0, Class=Vendor Specific Class, Driver=[none], 480M
    :
 ```
 
@@ -94,12 +94,12 @@ udevadm control --reload-rules
 udevadm trigger
 ```
 
-権限が変わっていることを確認。
+対象デバイス（`lsusb -t` の `Dev` に対応するファイル）の権限が変わっていることを確認。
 
 ```
 # ls -la /dev/bus/usb/001/
 total 0
 drwxr-xr-x 2 root root        100 Apr  8 23:10 .
 drwxr-xr-x 4 root root         80 Feb 22 11:54 ..
-crw-rw-rw- 1 root dialout 189, 35 Apr  9 22:47 036
+crw-rw-rw- 1 root dialout 189, 35 Apr  9 22:47 008
 ```
